@@ -107,6 +107,14 @@
           <artifactId>jetty-maven-plugin</artifactId>
           <version>9.4.28.v20200408</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-war-plugin</artifactId>
+          <version>3.2.3</version>
+          <configuration>
+            <failOnMissingWebXml>false</failOnMissingWebXml>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
   </build>
