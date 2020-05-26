@@ -61,7 +61,7 @@
   </dependencies>
 
   <build>
-    <finalName>fhir-on-cadsr</finalName>
+    <finalName>cadsr-on-fhir</finalName>
     <pluginManagement><!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
       <plugins>
         <!-- clean lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#clean_Lifecycle -->
@@ -114,7 +114,6 @@
           <version>3.2.3</version>
           <configuration>
             <failOnMissingWebXml>false</failOnMissingWebXml>
-            <warName>fhir-on-cadsr</warName>
           </configuration>
         </plugin>
       </plugins>
