@@ -18,6 +18,15 @@ To run from source with mvn, run
 mvn jetty:run 
 ```
 
+To build and push docker images with maven, 
+
+```
+mvn dockerfile:build
+mvn dockerfile:push
+```
+
+To learn how to set up Maven to work with docker, see [this](https://medium.com/better-programming/build-push-to-docker-with-maven-eea7c4b8cfa2)
+
 
 
 
