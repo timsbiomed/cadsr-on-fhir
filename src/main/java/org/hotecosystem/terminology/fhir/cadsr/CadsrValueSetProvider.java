@@ -33,13 +33,30 @@ public class CadsrValueSetProvider implements IResourceProvider {
         contact.setName("National Cancer Institute");
         String uri = "http://cbiit.nci.nih.gov/caDSR#" + id;
 
+        String mdq = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" +
+                "PREFIX cmdr: <http://cbiit.nci.nih.gov/caDSR#>\n" +
+                "PREFIX isomdr: <http://www.iso.org/11179/MDR#>\n" +
+                "PREFIX ncit: <http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#>\n" +
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
+                "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n" +
+                "\n" +
+                "select DISTINCT *  where {?url cmdr:publicId \"" + id + "\" .\n" +
+                "    ?url cmdr:short_name ?name ;\n" +
+                "         cmdr:publicId ?identifier1 ; \n" +
+                "         isomdr:VD_publicId ?identifier2 ;\n" +
+                "         isomdr:VD_version ?version ;\n" +
+                "         cmdr:short_name ?name ;\n" +
+                "         rdfs:label ?title ;\n" +
+                "         skos:definition ?description .\n" +
+                "}\n";
 
 
         ValueSet vs = new ValueSet();
         vs.setUrl(uri)
                 .setContact(Arrays.asList(contact))
                 .setStatus(Enumerations.PublicationStatus.ACTIVE)
-                .setPublisher("National Cancer Institute");
+                .setPublisher("National Cancer Institute")
+                .setDate(new Date());
         RepositoryConnection connection = repository.getConnection();
 
         String sparql = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" +
@@ -54,6 +71,24 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "}";
 
         try {
+            TupleQuery mdquery = connection.prepareTupleQuery(QueryLanguage.SPARQL, mdq);
+            TupleQueryResult mdResult = mdquery.evaluate();
+            if (mdResult.hasNext()) {
+                BindingSet bindings = mdResult.next();
+                vs.setTitle(bindings.getValue("title").stringValue())
+                        .setName(bindings.getValue("name").stringValue())
+                        .setDescription(bindings.getValue("description").stringValue())
+                        .setVersion(bindings.getValue("version").stringValue());
+                List<Identifier> identifiers = new ArrayList<>();
+                identifiers.add(new Identifier()
+                        .setSystem("http://www.iso.org/11179/MDR#VD_publicId")
+                        .setValue(bindings.getValue("identifier2").stringValue()));
+                identifiers.add(new Identifier()
+                        .setSystem("http://cbiit.nci.nih.gov/caDSR#")
+                        .setValue(bindings.getValue("identifier1").stringValue()));
+                vs.setIdentifier(identifiers);
+            }
+
             TupleQuery query = connection.prepareTupleQuery(QueryLanguage.SPARQL, sparql);
             TupleQueryResult tupleQueryResult = query.evaluate();
             Set<String> codes = new HashSet();
