@@ -67,7 +67,18 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "select DISTINCT ?s ?value ?label where {?s cmdr:publicId \"" + id + "\" .\n" +
                 "    ?s isomdr:permitted_value ?pv .\n" +
                 "    ?pv isomdr:value ?value .\n" +
-                "    ?pv rdfs:label ?label.\n" +
+                "    ?pv rdfs:label ?label. \n" +
+                "    { \n" +
+                "       ?pv cmdr:has_concept ?c . \n" +
+                "       ?c  cmdr:main_concept ?mc ; \n" +
+                "       cmdr:display_order ?oc  . \n" +
+                "    } \n" +
+                "    UNION \n" +
+                "    {	\n" +
+                "       ?pv cmdr:has_concept ?c . \n" +
+                "       ?c  cmdr:minor_concept ?mc ; \n" +
+                "       cmdr:display_order ?oc . \n" +
+                "    } \n" +
                 "}";
 
         try {
