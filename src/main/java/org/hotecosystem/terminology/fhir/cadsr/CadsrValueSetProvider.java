@@ -13,6 +13,7 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r5.model.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class CadsrValueSetProvider implements IResourceProvider {
     HTTPRepository repository;
@@ -64,20 +65,23 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "PREFIX isomdr: <http://www.iso.org/11179/MDR#>\n" +
                 "PREFIX ncit: <http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#>\n" +
                 "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
-                "select DISTINCT ?s ?value ?label where {?s cmdr:publicId \"" + id + "\" .\n" +
+                "select DISTINCT ?s ?value ?label ?concept_type ?concept_code ?concept_order where { \n" +
+                "    ?s cmdr:publicId \"" + id + "\" .\n" +
                 "    ?s isomdr:permitted_value ?pv .\n" +
                 "    ?pv isomdr:value ?value .\n" +
                 "    ?pv rdfs:label ?label. \n" +
                 "    { \n" +
                 "       ?pv cmdr:has_concept ?c . \n" +
-                "       ?c  cmdr:main_concept ?mc ; \n" +
-                "       cmdr:display_order ?oc  . \n" +
+                "       ?c  cmdr:main_concept ?concept_code ; \n" +
+                "           cmdr:display_order ?order  . \n" +
+                "       BIND(cmdr:main_concept as $concept_type) \n" +
                 "    } \n" +
                 "    UNION \n" +
                 "    {	\n" +
                 "       ?pv cmdr:has_concept ?c . \n" +
-                "       ?c  cmdr:minor_concept ?mc ; \n" +
-                "       cmdr:display_order ?oc . \n" +
+                "       ?c  cmdr:minor_concept ?concept_code ; \n" +
+                "           cmdr:display_order ?concept_order . \n" +
+                "       BIND(cmdr:minor_concept as $concept_type) \n" +
                 "    } \n" +
                 "}";
 
@@ -106,17 +110,29 @@ public class CadsrValueSetProvider implements IResourceProvider {
             ValueSet.ValueSetExpansionComponent expansion = new ValueSet.ValueSetExpansionComponent();
             expansion.setIdentifier(uri)
                     .setTimestamp(new Date());
-            List<ValueSet.ValueSetExpansionContainsComponent> vseccs = new ArrayList<>();
+            Map<String, ValueSet.ValueSetExpansionContainsComponent> topContains = new HashMap<>();
             while (tupleQueryResult.hasNext()) {
                 BindingSet bindings = tupleQueryResult.next();
-                ValueSet.ValueSetExpansionContainsComponent vsecc = new ValueSet.ValueSetExpansionContainsComponent();
-                vsecc.setSystem(bindings.getValue("s").stringValue())
-                        .setCode(bindings.getValue("value").stringValue())
+                String code = bindings.getValue("value").stringValue();
+                ValueSet.ValueSetExpansionContainsComponent topContain = topContains.getOrDefault(code,
+                        new ValueSet.ValueSetExpansionContainsComponent());
+                topContain.setSystem(bindings.getValue("s").stringValue())
+                        .setCode(code)
                         .setDisplay(bindings.getValue("label").stringValue());
-                vseccs.add(vsecc);
+                ValueSet.ValueSetExpansionContainsComponent childContain = new ValueSet.ValueSetExpansionContainsComponent();
+                String concept = bindings.getValue("concept_code").stringValue();
+                int bp = concept.lastIndexOf("#");
+                String prefix = concept.substring(0, bp+1);
+                String conceptCode = concept.substring(bp+1);
+                childContain.setSystem(prefix).setCode(conceptCode);
+                Extension extension = new Extension("http://hotecosystem.org/fhir/StructureDefinition/cadsr-concept-type");
+                extension.setValue(new StringType(bindings.getValue("concept_type").stringValue()));
+                childContain.addExtension(extension);
+                topContain.getContains().add(childContain);
+                topContains.put(code, topContain);
             }
-            expansion.setTotal(vseccs.size());
-            expansion.setContains(vseccs);
+            expansion.setTotal(topContains.size());
+            expansion.setContains(topContains.values().stream().collect(Collectors.toList()));
             tupleQueryResult.close();
             vs.setExpansion(expansion);
         } finally {
