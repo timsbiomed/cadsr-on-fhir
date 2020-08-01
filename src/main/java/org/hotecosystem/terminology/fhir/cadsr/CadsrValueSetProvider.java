@@ -73,7 +73,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "    { \n" +
                 "       ?pv cmdr:has_concept ?c . \n" +
                 "       ?c  cmdr:main_concept ?concept_code ; \n" +
-                "           cmdr:display_order ?order  . \n" +
+                "           cmdr:display_order ?concept_order  . \n" +
                 "       BIND(cmdr:main_concept as $concept_type) \n" +
                 "    } \n" +
                 "    UNION \n" +
@@ -125,9 +125,20 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 String prefix = concept.substring(0, bp+1);
                 String conceptCode = concept.substring(bp+1);
                 childContain.setSystem(prefix).setCode(conceptCode);
-                Extension extension = new Extension("http://hotecosystem.org/fhir/StructureDefinition/cadsr-concept-type");
-                extension.setValue(new StringType(bindings.getValue("concept_type").stringValue()));
-                childContain.addExtension(extension);
+
+                String conceptType = bindings.getValue("concept_type").stringValue();
+                bp = conceptType.lastIndexOf("#");
+                String conceptTypePrefix = conceptType.substring(0, bp+1);
+                String conceptTypeCode = conceptType.substring(bp+1);
+                Extension conceptTypeExtension = new Extension("http://hotecosystem.org/fhir/hot/StructureDefinition/hot-cadsr-concept-type-extension");
+                CodeableConcept codeableConcept = new CodeableConcept();
+                codeableConcept.addCoding(new Coding().setCode(conceptTypeCode).setSystem(conceptTypePrefix));
+                conceptTypeExtension.setValue(codeableConcept);
+                childContain.addExtension(conceptTypeExtension);
+
+                Extension conceptOrderExtension = new Extension("http://hotecosystem.org/fhir/hot/StructureDefinition/hot-cadsr-concept-order-extension");
+                conceptOrderExtension.setValue(new UnsignedIntType(bindings.getValue("concept_order").stringValue()));
+                childContain.addExtension(conceptOrderExtension);
                 topContain.getContains().add(childContain);
                 topContains.put(code, topContain);
             }
