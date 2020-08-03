@@ -21,6 +21,7 @@ mvn jetty:run
 To build and push docker images with maven, 
 
 ```
+mvn package
 mvn dockerfile:build
 mvn dockerfile:push
 ```
