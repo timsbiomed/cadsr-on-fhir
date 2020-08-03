@@ -1,8 +1,11 @@
 package org.hotecosystem.terminology.fhir.cadsr;
 
+import ca.uhn.fhir.model.api.annotation.Block;
+import ca.uhn.fhir.model.api.annotation.Child;
 import ca.uhn.fhir.rest.annotation.IdParam;
 import ca.uhn.fhir.rest.annotation.Read;
 import ca.uhn.fhir.rest.server.IResourceProvider;
+import ca.uhn.fhir.util.ElementUtil;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
@@ -65,7 +68,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "PREFIX isomdr: <http://www.iso.org/11179/MDR#>\n" +
                 "PREFIX ncit: <http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#>\n" +
                 "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
-                "select DISTINCT ?s ?value ?label ?concept_type ?concept_code ?concept_order where { \n" +
+                "select DISTINCT ?s ?value ?label ?concept_type ?concept_code ?concept_order ?concept_display where { \n" +
                 "    ?s cmdr:publicId \"" + id + "\" .\n" +
                 "    ?s isomdr:permitted_value ?pv .\n" +
                 "    ?pv isomdr:value ?value .\n" +
@@ -74,6 +77,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "       ?pv cmdr:has_concept ?c . \n" +
                 "       ?c  cmdr:main_concept ?concept_code ; \n" +
                 "           cmdr:display_order ?concept_order  . \n" +
+                "       ?concept_code ncit:P97 ?concept_display . \n" +
                 "       BIND(cmdr:main_concept as $concept_type) \n" +
                 "    } \n" +
                 "    UNION \n" +
@@ -81,6 +85,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "       ?pv cmdr:has_concept ?c . \n" +
                 "       ?c  cmdr:minor_concept ?concept_code ; \n" +
                 "           cmdr:display_order ?concept_order . \n" +
+                "       ?concept_code ncit:P97 ?concept_display . \n" +
                 "       BIND(cmdr:minor_concept as $concept_type) \n" +
                 "    } \n" +
                 "}";
@@ -110,36 +115,39 @@ public class CadsrValueSetProvider implements IResourceProvider {
             ValueSet.ValueSetExpansionComponent expansion = new ValueSet.ValueSetExpansionComponent();
             expansion.setIdentifier(uri)
                     .setTimestamp(new Date());
-            Map<String, ValueSet.ValueSetExpansionContainsComponent> topContains = new HashMap<>();
+            Map<String, CadsrHasConceptContains> topContains = new HashMap<>();
             while (tupleQueryResult.hasNext()) {
                 BindingSet bindings = tupleQueryResult.next();
                 String code = bindings.getValue("value").stringValue();
-                ValueSet.ValueSetExpansionContainsComponent topContain = topContains.getOrDefault(code,
-                        new ValueSet.ValueSetExpansionContainsComponent());
+                CadsrHasConceptContains topContain = topContains.getOrDefault(code, new CadsrHasConceptContains());
                 topContain.setSystem(bindings.getValue("s").stringValue())
                         .setCode(code)
                         .setDisplay(bindings.getValue("label").stringValue());
+
                 ValueSet.ValueSetExpansionContainsComponent childContain = new ValueSet.ValueSetExpansionContainsComponent();
                 String concept = bindings.getValue("concept_code").stringValue();
                 int bp = concept.lastIndexOf("#");
-                String prefix = concept.substring(0, bp+1);
-                String conceptCode = concept.substring(bp+1);
-                childContain.setSystem(prefix).setCode(conceptCode);
+                String prefixStr = concept.substring(0, bp+1);
+                String conceptCodeStr = concept.substring(bp+1);
+                String conceptDisplay = bindings.getValue("concept_display").stringValue();
+                Coding coding = new Coding().setCode(conceptCodeStr).setSystem(prefixStr).setDisplay(conceptDisplay);
 
                 String conceptType = bindings.getValue("concept_type").stringValue();
                 bp = conceptType.lastIndexOf("#");
                 String conceptTypePrefix = conceptType.substring(0, bp+1);
                 String conceptTypeCode = conceptType.substring(bp+1);
-                Extension conceptTypeExtension = new Extension("http://hotecosystem.org/fhir/hot/StructureDefinition/hot-cadsr-concept-type-extension");
-                CodeableConcept codeableConcept = new CodeableConcept();
-                codeableConcept.addCoding(new Coding().setCode(conceptTypeCode).setSystem(conceptTypePrefix));
-                conceptTypeExtension.setValue(codeableConcept);
-                childContain.addExtension(conceptTypeExtension);
 
-                Extension conceptOrderExtension = new Extension("http://hotecosystem.org/fhir/hot/StructureDefinition/hot-cadsr-concept-order-extension");
-                conceptOrderExtension.setValue(new UnsignedIntType(bindings.getValue("concept_order").stringValue()));
-                childContain.addExtension(conceptOrderExtension);
-                topContain.getContains().add(childContain);
+
+                CodeableConcept conceptCode = new CodeableConcept();
+                conceptCode.addCoding(coding);
+                if (conceptTypeCode.equals("main_concept")) {
+                    topContain.setMainConcept(conceptCode);
+                } else if (conceptTypeCode.equals("minor_concept")) {
+                    List<CodeableConcept> conceptCodes = topContain.getMinorConcept() == null ?
+                            new ArrayList<CodeableConcept>() : topContain.getMinorConcept();
+                    conceptCodes.add(conceptCode);
+                    topContain.setMinorConcept(conceptCodes);
+                }
                 topContains.put(code, topContain);
             }
             expansion.setTotal(topContains.size());
@@ -150,5 +158,48 @@ public class CadsrValueSetProvider implements IResourceProvider {
             connection.close();
         }
         return vs;
+    }
+
+    @Block
+    public static class CadsrHasConceptContains extends ValueSet.ValueSetExpansionContainsComponent {
+        private static final long serialVersionUID = 4522090347756045145L;
+
+        @Child(name = "mainConcept")
+        @ca.uhn.fhir.model.api.annotation.Extension(url = "http://cbiit.nci.nih.gov/caDSR#major_concept", definedLocally = false, isModifier = false)
+        private CodeableConcept mainConcept;
+
+        @Child(name = "minorConcept")
+        @ca.uhn.fhir.model.api.annotation.Extension(url = "http://cbiit.nci.nih.gov/caDSR#minor_concept", definedLocally = false, isModifier = false)
+        private List<CodeableConcept> minorConcept;
+
+        @Override
+        public CadsrHasConceptContains copy() {
+            CadsrHasConceptContains copy = new CadsrHasConceptContains();
+            copy.mainConcept = mainConcept;
+            copy.minorConcept = minorConcept;
+            return copy;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return super.isEmpty() && ElementUtil.isEmpty(mainConcept, minorConcept);
+        }
+
+        public List<CodeableConcept> getMinorConcept() {
+            return minorConcept;
+        }
+
+        public CodeableConcept getMainConcept() {
+            return mainConcept;
+        }
+
+        public void setMinorConcept(List<CodeableConcept> minorConcept) {
+            this.minorConcept = minorConcept;
+        }
+
+        public void setMainConcept(CodeableConcept mainConcept) {
+            this.mainConcept = mainConcept;
+        }
+
     }
 }
