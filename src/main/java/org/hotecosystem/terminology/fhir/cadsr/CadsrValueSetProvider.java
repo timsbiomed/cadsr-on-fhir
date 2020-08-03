@@ -165,7 +165,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
         private static final long serialVersionUID = 4522090347756045145L;
 
         @Child(name = "mainConcept")
-        @ca.uhn.fhir.model.api.annotation.Extension(url = "http://cbiit.nci.nih.gov/caDSR#major_concept", definedLocally = false, isModifier = false)
+        @ca.uhn.fhir.model.api.annotation.Extension(url = "http://cbiit.nci.nih.gov/caDSR#main_concept", definedLocally = false, isModifier = false)
         private CodeableConcept mainConcept;
 
         @Child(name = "minorConcept")
