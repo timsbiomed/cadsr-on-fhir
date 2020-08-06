@@ -77,7 +77,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "       ?pv cmdr:has_concept ?c . \n" +
                 "       ?c  cmdr:main_concept ?concept_code ; \n" +
                 "           cmdr:display_order ?concept_order  . \n" +
-                "       ?concept_code ncit:P97 ?concept_display . \n" +
+                "       ?concept_code ncit:P108 ?concept_display . \n" +
                 "       BIND(cmdr:main_concept as $concept_type) \n" +
                 "    } \n" +
                 "    UNION \n" +
@@ -85,7 +85,7 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "       ?pv cmdr:has_concept ?c . \n" +
                 "       ?c  cmdr:minor_concept ?concept_code ; \n" +
                 "           cmdr:display_order ?concept_order . \n" +
-                "       ?concept_code ncit:P97 ?concept_display . \n" +
+                "       ?concept_code ncit:P108 ?concept_display . \n" +
                 "       BIND(cmdr:minor_concept as $concept_type) \n" +
                 "    } \n" +
                 "}";
