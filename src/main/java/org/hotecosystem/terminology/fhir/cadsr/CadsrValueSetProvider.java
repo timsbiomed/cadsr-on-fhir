@@ -73,20 +73,22 @@ public class CadsrValueSetProvider implements IResourceProvider {
                 "    ?s isomdr:permitted_value ?pv .\n" +
                 "    ?pv isomdr:value ?value .\n" +
                 "    ?pv rdfs:label ?label. \n" +
-                "    { \n" +
-                "       ?pv cmdr:has_concept ?c . \n" +
-                "       ?c  cmdr:main_concept ?concept_code ; \n" +
-                "           cmdr:display_order ?concept_order  . \n" +
-                "       ?concept_code ncit:P108 ?concept_display . \n" +
-                "       BIND(cmdr:main_concept as $concept_type) \n" +
-                "    } \n" +
-                "    UNION \n" +
-                "    {	\n" +
-                "       ?pv cmdr:has_concept ?c . \n" +
-                "       ?c  cmdr:minor_concept ?concept_code ; \n" +
-                "           cmdr:display_order ?concept_order . \n" +
-                "       ?concept_code ncit:P108 ?concept_display . \n" +
-                "       BIND(cmdr:minor_concept as $concept_type) \n" +
+                "    OPTIONAL { \n" +
+                "        { \n" +
+                "           ?pv cmdr:has_concept ?c . \n" +
+                "           ?c  cmdr:main_concept ?concept_code ; \n" +
+                "               cmdr:display_order ?concept_order  . \n" +
+                "           ?concept_code ncit:P108 ?concept_display . \n" +
+                "           BIND(cmdr:main_concept as $concept_type) \n" +
+                "       } \n" +
+                "       UNION \n" +
+                "       {	\n" +
+                "           ?pv cmdr:has_concept ?c . \n" +
+                "           ?c  cmdr:minor_concept ?concept_code ; \n" +
+                "               cmdr:display_order ?concept_order . \n" +
+                "           ?concept_code ncit:P108 ?concept_display . \n" +
+                "           BIND(cmdr:minor_concept as $concept_type) \n" +
+                "       } \n" +
                 "    } \n" +
                 "}";
 
@@ -124,29 +126,31 @@ public class CadsrValueSetProvider implements IResourceProvider {
                         .setCode(code)
                         .setDisplay(bindings.getValue("label").stringValue());
 
-                ValueSet.ValueSetExpansionContainsComponent childContain = new ValueSet.ValueSetExpansionContainsComponent();
-                String concept = bindings.getValue("concept_code").stringValue();
-                int bp = concept.lastIndexOf("#");
-                String prefixStr = concept.substring(0, bp+1);
-                String conceptCodeStr = concept.substring(bp+1);
-                String conceptDisplay = bindings.getValue("concept_display").stringValue();
-                Coding coding = new Coding().setCode(conceptCodeStr).setSystem(prefixStr).setDisplay(conceptDisplay);
+                if (bindings.hasBinding("concept_code")) { // Some code not mapped to NCIt. See issue #2, cadsr:2178467
+                    ValueSet.ValueSetExpansionContainsComponent childContain = new ValueSet.ValueSetExpansionContainsComponent();
+                    String concept = bindings.getValue("concept_code").stringValue();
+                    int bp = concept.lastIndexOf("#");
+                    String prefixStr = concept.substring(0, bp + 1);
+                    String conceptCodeStr = concept.substring(bp + 1);
+                    String conceptDisplay = bindings.getValue("concept_display").stringValue();
+                    Coding coding = new Coding().setCode(conceptCodeStr).setSystem(prefixStr).setDisplay(conceptDisplay);
 
-                String conceptType = bindings.getValue("concept_type").stringValue();
-                bp = conceptType.lastIndexOf("#");
-                String conceptTypePrefix = conceptType.substring(0, bp+1);
-                String conceptTypeCode = conceptType.substring(bp+1);
+                    String conceptType = bindings.getValue("concept_type").stringValue();
+                    bp = conceptType.lastIndexOf("#");
+                    String conceptTypePrefix = conceptType.substring(0, bp + 1);
+                    String conceptTypeCode = conceptType.substring(bp + 1);
 
 
-                CodeableConcept conceptCode = new CodeableConcept();
-                conceptCode.addCoding(coding);
-                if (conceptTypeCode.equals("main_concept")) {
-                    topContain.setMainConcept(conceptCode);
-                } else if (conceptTypeCode.equals("minor_concept")) {
-                    List<CodeableConcept> conceptCodes = topContain.getMinorConcept() == null ?
-                            new ArrayList<CodeableConcept>() : topContain.getMinorConcept();
-                    conceptCodes.add(conceptCode);
-                    topContain.setMinorConcept(conceptCodes);
+                    CodeableConcept conceptCode = new CodeableConcept();
+                    conceptCode.addCoding(coding);
+                    if (conceptTypeCode.equals("main_concept")) {
+                        topContain.setMainConcept(conceptCode);
+                    } else if (conceptTypeCode.equals("minor_concept")) {
+                        List<CodeableConcept> conceptCodes = topContain.getMinorConcept() == null ?
+                                new ArrayList<CodeableConcept>() : topContain.getMinorConcept();
+                        conceptCodes.add(conceptCode);
+                        topContain.setMinorConcept(conceptCodes);
+                    }
                 }
                 topContains.put(code, topContain);
             }
